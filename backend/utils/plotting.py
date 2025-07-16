@@ -415,17 +415,7 @@ def plot_fmi_with_area_circularity_filtered_contours(
     custom_str = f'_{custom_fname}' if custom_fname else ''
     well_str = f'_{well_name}' if well_name else ''
 
-    # Initialize subplots: original + one per threshold
-    #fig, axes = plt.subplots(1, len(different_thresholds) + 1, figsize=figsize)
-
-    # Plot the original unscaled FMI image
-    #im = axes[0].imshow(fmi_array_unscaled_one_meter_zone, cmap='YlOrBr')
-    #axes[0].set_title('Original FMI', fontsize=fontsize)
-    #axes[0].get_yaxis().set_visible(False)
-    #axes[0].set_xticks(np.linspace(0, fmi_array_one_meter_zone.shape[1], 5))
-    #axes[0].tick_params(axis='both', which='major', labelsize=labelsize)
-    #if colorbar:
-    #    create_colorbar(axes[0], im, fontsize=labelsize)
+    
 
     # Precompute geometry
     hole_radius_cm = well_radius_one_meter_zone.mean() * 100

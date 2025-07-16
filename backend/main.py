@@ -44,7 +44,7 @@ def extractvugs(vug_request: VugRequest):
         # Load filtered FMI and depth data
         filtered_data = pd.read_csv("/app/well_files/fmi_array.csv", header=None).astype(float).values
         filtered_depths = pd.read_csv("/app/well_files/tdep_array.csv", header=None).astype(float).values.squeeze()
-
+        well_radius = pd.read_csv("/app/well_files/well_radius.csv", header=None).astype(float).values.squeeze()
         # Derive depth range from filtered depths
         start_depth = filtered_depths.min()
         end_depth = filtered_depths.max()
@@ -53,6 +53,7 @@ def extractvugs(vug_request: VugRequest):
         buf = extract_and_plot_contours(
             data_path=filtered_data,
             depth_path=filtered_depths,
+            well_radius=well_radius,
             start_depth=start_depth,
             end_depth=end_depth,
             min_vug_area=min_area,
@@ -108,7 +109,7 @@ def plotfmi_handler():
             start_depth=DEPTH_VEC.min(),
             end_depth=DEPTH_VEC.max()
         )
-        png_bytes = array_to_png(fmi_array[:10000], tdep_array[:10000])
+        png_bytes = array_to_png(fmi_array, tdep_array)
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
 

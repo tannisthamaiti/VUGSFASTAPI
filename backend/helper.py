@@ -71,6 +71,10 @@ def load_and_scale(array_input: np.ndarray) -> np.ndarray:
 
 
 # ─── rendering ─────────────────────────────────────────────────────────
+import numpy as np
+import matplotlib.pyplot as plt
+import io
+
 def array_to_png(arr: np.ndarray, depth: np.ndarray) -> bytes:
     """
     Return a PNG byte-string of a depth-referenced heat-map.
@@ -78,14 +82,27 @@ def array_to_png(arr: np.ndarray, depth: np.ndarray) -> bytes:
     if arr.shape[0] != depth.size:
         raise ValueError("Depth vector length and array row count mismatch")
 
-    extent = [0, arr.shape[1], depth[-1], depth[0]]  # y-axis flipped
+    # Define the plotting extent using depth (y-axis is depth)
+    extent = [0, arr.shape[1], depth[-1], depth[0]]  # top to bottom
 
-    fig, ax = plt.subplots(figsize=(6, 6), dpi=150)
+    # Dynamically calculate figure height based on number of rows
+    height_per_row = 0.004
+    fig_height = max(6, arr.shape[0] * height_per_row)
+    fig_width = 6
+
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=150)
     im = ax.imshow(arr, cmap="YlOrBr", aspect="auto", extent=extent)
+
     ax.set_title("FMI")
-    #ax.set_xlabel("Column Index")
     ax.set_ylabel("Depth (m)")
-    #ax.invert_yaxis()
+    ax.set_xlabel("Column Index")
+    
+    # Show y-ticks using a reasonable number of bins
+    num_ticks = 10
+    y_ticks = np.linspace(depth.min(), depth.max(), num_ticks)
+    ax.set_yticks(y_ticks)
+    ax.tick_params(axis='both', which='major', labelsize=8)
+
     fig.colorbar(im, ax=ax, label="Scaled Intensity (0-1)")
     fig.tight_layout()
 

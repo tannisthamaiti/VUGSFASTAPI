@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 def extract_and_plot_contours(
     data_path: str,
     depth_path: str,
+    well_radius: str,
     start_depth: float,
     end_depth: float,
     block_size: int = 21,
@@ -27,7 +28,7 @@ def extract_and_plot_contours(
 
     fmi_array=data_path
     tdep_array = depth_path
-    well_radius = np.full_like(tdep_array, 8.0)
+    well_radius = well_radius
     start = start_depth
     end = end_depth
     
