@@ -3,6 +3,7 @@ from utils.data import get_data
 from utils.pre_processing import preprocessing, get_one_meter_fmi_and_GT
 from utils.vugs import extract_contours_multi_thresholded_fmi_after_area_circularity_filtering
 from utils.plotting import plot_fmi_with_area_circularity_filtered_contours
+from utils.processing import get_mode_of_interest_from_image
 from os.path import join as pjoin
 import os
 import matplotlib.pyplot as plt
@@ -22,9 +23,7 @@ def extract_and_plot_contours(
     centroid_threshold=5,
     plot=True
 ):
-    # Load full data
-    #fmi_array, tdep_array, well_radius, gt = get_data(data_path)
-    #start, end = int(np.ceil(gt.Depth.min())), int(gt.Depth.max())
+    
 
     fmi_array=data_path
     tdep_array = depth_path
@@ -41,14 +40,16 @@ def extract_and_plot_contours(
 
     # Mask zone of interest
     outputs = get_one_meter_fmi_and_GT(
-        start_depth, end_depth, tdep_array_doi, fmi_array_doi, well_radius_doi, scale_individual_patch=True
+        start_depth, end_depth, tdep_array, fmi_array, well_radius, scale_individual_patch=True
     )
     
     fmi_array_zone, tdep_array_zone, well_radius_zone, mask = outputs
-    fmi_array_unscaled = fmi_array_doi_unscaled[mask]
+    #fmi_array_unscaled = fmi_array_doi_unscaled[mask]
 
     # Thresholds
     different_thresholds = [np.median(fmi_array_zone)]  # simplified threshold for demo
+    different_thresholds, count_of_different_thresholds = get_mode_of_interest_from_image(fmi_array_zone, 5, 5)
+    print(different_thresholds)
 
     # Extract vug contours
     outputs = extract_contours_multi_thresholded_fmi_after_area_circularity_filtering(
@@ -67,7 +68,7 @@ def extract_and_plot_contours(
     # Plot
     if plot:
         fig_path=plot_fmi_with_area_circularity_filtered_contours(
-            fmi_array_zone, fmi_array_unscaled, different_thresholds, block_size, c_threshold,
+            fmi_array_zone, fmi_array_doi_unscaled, different_thresholds, block_size, c_threshold,
             start_depth, end_depth, well_radius_zone, tdep_array_zone,
             min_vug_area, max_vug_area, min_circ_ratio, max_circ_ratio,
             save_path=save_path, save=True, depth=start_depth, picture_format="png"

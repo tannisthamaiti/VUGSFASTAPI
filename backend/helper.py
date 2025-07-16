@@ -11,6 +11,7 @@ matplotlib.use("Agg")             # head-less server backend
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import io
 
 # ─── config ────────────────────────────────────────────────────────────
 MISSING_THRESHOLD = -5000         # ≤ −5000 → missing / NaN
@@ -71,9 +72,6 @@ def load_and_scale(array_input: np.ndarray) -> np.ndarray:
 
 
 # ─── rendering ─────────────────────────────────────────────────────────
-import numpy as np
-import matplotlib.pyplot as plt
-import io
 
 def array_to_png(arr: np.ndarray, depth: np.ndarray) -> bytes:
     """
@@ -82,28 +80,30 @@ def array_to_png(arr: np.ndarray, depth: np.ndarray) -> bytes:
     if arr.shape[0] != depth.size:
         raise ValueError("Depth vector length and array row count mismatch")
 
-    # Define the plotting extent using depth (y-axis is depth)
-    extent = [0, arr.shape[1], depth[-1], depth[0]]  # top to bottom
+    extent = [0, arr.shape[1], depth[-1], depth[0]]  # Flip Y-axis
 
-    # Dynamically calculate figure height based on number of rows
+    # Adjust height for clarity
     height_per_row = 0.004
     fig_height = max(6, arr.shape[0] * height_per_row)
     fig_width = 6
 
     fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=150)
-    im = ax.imshow(arr, cmap="YlOrBr", aspect="auto", extent=extent)
 
-    ax.set_title("FMI")
+    im = ax.imshow(arr, cmap="YlOrBr", aspect="auto", extent=extent)
+    #ax.set_title("FMI")
     ax.set_ylabel("Depth (m)")
     ax.set_xlabel("Column Index")
-    
-    # Show y-ticks using a reasonable number of bins
+
+    # Add horizontal colorbar on top
+    cbar = fig.colorbar(im, ax=ax, orientation='horizontal', pad=0.2)
+    cbar.set_label("Scaled Intensity (0-1)")
+
+    # Configure Y-ticks
     num_ticks = 10
     y_ticks = np.linspace(depth.min(), depth.max(), num_ticks)
     ax.set_yticks(y_ticks)
     ax.tick_params(axis='both', which='major', labelsize=8)
 
-    fig.colorbar(im, ax=ax, label="Scaled Intensity (0-1)")
     fig.tight_layout()
 
     buf = io.BytesIO()
