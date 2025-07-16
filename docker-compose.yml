@@ -1,0 +1,13 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "3002:3002"
+    volumes:
+      - .:/app
+      - ./well_files:/app/well_files  # ✅ mount shared folder
+      - ./output:/app/output  # ✅ mount shared folder
+    restart: always
+

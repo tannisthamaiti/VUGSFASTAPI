@@ -41,7 +41,7 @@ MISSING_THRESHOLD = -5000         # ≤ −5000 → missing / NaN
 #     col_max = np.nanmax(arr, axis=0, keepdims=True)
 #     scaled  = (arr - col_min) / (col_max - col_min)
 #     return np.nan_to_num(scaled, nan=0.0)
-import numpy as np
+
 
 MISSING_THRESHOLD = -998.0  # or your defined threshold
 
