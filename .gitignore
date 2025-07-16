@@ -1,0 +1,20 @@
+# Ignore Python cache files
+__pycache__/
+**/__pycache__/
+
+# Ignore VS Code settings (optional)
+.vscode/
+
+# Ignore well_files directory
+well_files/
+
+# Ignore common Python artifacts
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.sqlite3
+*.env
+*.egg-info/
+dist/
+build/
