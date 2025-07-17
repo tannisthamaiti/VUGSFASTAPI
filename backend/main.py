@@ -94,7 +94,7 @@ def plotfmi_handler():
 
 
     # Preprocess
-    fmi_array[fmi_array <= MISSING_THRESHOLD] = np.nan
+    #fmi_array[fmi_array <= MISSING_THRESHOLD] = np.nan
     try:
         DEPTH_VEC = load_depth(tdep_array)       # (N,)
         SCALED_DATA = load_and_scale(fmi_array)  # (N, M)
