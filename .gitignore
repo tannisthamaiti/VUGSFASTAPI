@@ -19,3 +19,4 @@ well_files/
 *.egg-info/
 dist/
 build/
+5_fmi_contour_area_circularity_filtered_.png
