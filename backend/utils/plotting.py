@@ -445,7 +445,7 @@ def plot_fmi_with_area_circularity_filtered_contours(
         print(contours)
         plot_single_image_contours(
             mode_subtracted_fmi, contours, ax, linewidth=2, cmap='YlOrBr', 
-            colorbar=colorbar, fontsize=fontsize, labelsize=labelsize
+            colorbar=False, fontsize=fontsize, labelsize=labelsize
         )
     # threshold = different_thresholds
     # threshold_img, _ = apply_adaptive_thresholding(

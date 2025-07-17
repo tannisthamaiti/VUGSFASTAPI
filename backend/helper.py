@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import io
-
+from multiprocessing import Pool, cpu_count
+from PIL import Image
 # ─── config ────────────────────────────────────────────────────────────
 MISSING_THRESHOLD = -5000         # ≤ −5000 → missing / NaN
 
@@ -111,3 +112,69 @@ def array_to_png(arr: np.ndarray, depth: np.ndarray) -> bytes:
     plt.close(fig)
     buf.seek(0)
     return buf.read()
+
+def render_batch(batch_arr: np.ndarray, batch_depth: np.ndarray) -> bytes:
+    """Render a single batch to a PNG byte stream (no colorbar)."""
+    extent = [0, batch_arr.shape[1], batch_depth[-1], batch_depth[0]]
+
+    # Adjust height for clarity
+    height_per_row = 0.004
+    fig_height = max(4, batch_arr.shape[0] * height_per_row)
+    fig_width = 6
+
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=100)
+    im = ax.imshow(batch_arr, cmap="YlOrBr", aspect="auto", extent=extent)
+
+    ax.set_ylabel("Depth (m)")
+    ax.set_xlabel("Column Index")
+
+    # Y-ticks
+    num_ticks = min(6, len(batch_depth))
+    y_ticks = np.linspace(batch_depth.min(), batch_depth.max(), num_ticks)
+    ax.set_yticks(y_ticks)
+    ax.tick_params(axis='both', which='major', labelsize=8)
+
+    fig.tight_layout()
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    return buf.read()
+
+
+def array_to_png_batches_parallel(arr: np.ndarray, depth: np.ndarray, batch_size: int = 200) -> bytes:
+    """
+    Process FMI array in batches and return a stitched PNG image byte stream (parallel, no colorbar).
+    """
+    if arr.shape[0] != depth.size:
+        raise ValueError("Depth vector length and array row count mismatch")
+
+    batch_inputs = []
+    for start_idx in range(0, arr.shape[0], batch_size):
+        end_idx = min(start_idx + batch_size, arr.shape[0])
+        batch_arr = arr[start_idx:end_idx, :]
+        batch_depth = depth[start_idx:end_idx]
+        batch_inputs.append((batch_arr, batch_depth))
+
+    # Use multiprocessing to process batches in parallel
+    with Pool(processes=min(cpu_count(), len(batch_inputs))) as pool:
+        batch_byte_images = pool.starmap(render_batch, batch_inputs)
+
+    # Convert byte-images to PIL and stitch vertically
+    batch_images = [Image.open(io.BytesIO(b)).convert("RGB") for b in batch_byte_images]
+    total_width = max(img.width for img in batch_images)
+    total_height = sum(img.height for img in batch_images)
+
+    stitched_image = Image.new("RGB", (total_width, total_height))
+    y_offset = 0
+    for img in batch_images:
+        stitched_image.paste(img, (0, y_offset))
+        y_offset += img.height
+
+    # Final image as byte stream
+    final_buf = io.BytesIO()
+    stitched_image.save(final_buf, format="PNG")
+    final_buf.seek(0)
+    return final_buf.read()
+

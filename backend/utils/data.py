@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 from dlisio import dlis
 from os.path import join as pjoin
+from utils.misc import inch_to_meter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def get_logical_file(dlis_file_name, data_path, dyn):
     """
@@ -59,83 +61,95 @@ def get_logical_file(dlis_file_name, data_path, dyn):
 
     return logical_file
 
-def get_fmi_with_depth_and_radius(logical_file, dyn, reverse=True):
-    from utils.misc import inch_to_meter
-    import numpy as np
-
-    fmi_array = None
-    tdep_array = None
-    well_radius = None
+def get_fmi_with_depth_and_radius(logical_file, dyn=True, reverse=True, max_samples=None, downsample_factor=None):
+   
 
     if not hasattr(logical_file, "channels") or not logical_file.channels:
-        raise ValueError("logical_file has no channels or channels list is empty.")
+        raise ValueError("logical_file has no channels.")
 
-    print("logical_file.channels content:")
-    for idx, channel in enumerate(logical_file.channels):
-        print(f"{idx+1}. Name: {channel.name}, Unit: {getattr(channel, 'units', 'N/A')}, Sample count: {len(channel.curves())}")
-
-    # Find image data
-    for channel in logical_file.channels:
-        if dyn:
-            if channel.name in ['FMI_DYN', 'CMI_DYN', 'TB_IMAGE_DYN_DMS_IMG']:
-                fmi_array = channel.curves()
-                print(f'{channel.name} loaded, shape: {fmi_array.shape}')
-        else:
-            if channel.name in ['FMI_STAT', 'CMI_STAT', 'TB_IMAGE_STA_DMS_IMG', 'FMI_-STAT']:
-                fmi_array = channel.curves()
-                print(f'{channel.name} loaded, shape: {fmi_array.shape}')
-
-        if channel.name in ['TDEP', 'MD', 'DEPTH']:
-            tdep_array = channel.curves()
-            print(f'{channel.name} loaded, shape: {tdep_array.shape}')
-            print(f'Original depth: {tdep_array}')
-            print(f'Unit: {channel.units}')
-
-            if channel.units.endswith('in') or tdep_array[0] > 5000:
-                tdep_array = inch_to_meter(tdep_array)
-                print(f'Depth after conversion: {tdep_array}')
-
-    if fmi_array is None or tdep_array is None:
-        raise ValueError("Missing required FMI or depth data in logical_file")
-
-    # Well radius logic
     channels = logical_file.channels
-    channel_names = [c.name for c in channels]
+    channel_lookup = {ch.name: ch for ch in channels}
 
-    if 'ASSOC_CAL' in channel_names:
-        print('Getting radius from ASSOC_CAL channel')
-        radius_channel = channels[channel_names.index('ASSOC_CAL')]
-        well_diameter = radius_channel.curves()
-        well_diameter[well_diameter == -9999.] = np.nan
-        if 'in' in radius_channel.units:
-            well_diameter = inch_to_meter(well_diameter, radius=True)
-        well_radius = well_diameter / 2
-    else:
-        caliper_log = ['C1_13', 'C1_24', 'C2_13', 'C2_24', 'C3_13', 'C3_24']
-        try:
-            well_diameter = np.asarray([channels[channel_names.index(i)].curves() for i in caliper_log])
-            well_diameter[well_diameter == -9999.] = np.nan
-            well_diameter = well_diameter.mean(axis=0)
-            if 'in' in channels[channel_names.index(caliper_log[0])].units:
-                well_diameter = inch_to_meter(well_diameter, radius=True)
-            well_radius = well_diameter / 2
-        except ValueError:
-            raise ValueError("Could not retrieve caliper data for well radius estimation.")
+    # --- Channel priorities
+    fmi_keys = ['FMI_DYN', 'CMI_DYN', 'TB_IMAGE_DYN_DMS_IMG'] if dyn else ['FMI_STAT', 'CMI_STAT', 'TB_IMAGE_STA_DMS_IMG', 'FMI_-STAT']
+    depth_keys = ['TDEP', 'MD', 'DEPTH']
+    caliper_keys = ['ASSOC_CAL', 'C1_13', 'C1_24', 'C2_13', 'C2_24', 'C3_13', 'C3_24']
 
-    # Reverse logic
-    if reverse:
-        if tdep_array[0] < tdep_array[-1]:
-            print("Reversing depth and image arrays...")
-            fmi_array = fmi_array[::-1]
-            tdep_array = tdep_array[::-1]
-            well_radius = well_radius[::-1]
+    targets = fmi_keys + depth_keys + caliper_keys
+
+    def safe_read_curve(name):
+        ch = channel_lookup.get(name)
+        if ch:
+            try:
+                data = ch.curves()
+                if max_samples:
+                    data = data[:max_samples]
+                if downsample_factor:
+                    data = data[::downsample_factor]
+                unit = getattr(ch, 'units', '')
+                return name, data, unit
+            except Exception as e:
+                print(f"⚠️ Failed to read {name}: {e}")
+        return name, None, None
+
+    # --- Parallel safe reads
+    results = {}
+    with ThreadPoolExecutor() as ex:
+        futures = {ex.submit(safe_read_curve, name): name for name in targets}
+        for future in futures:
+            name, data, unit = future.result()
+            if data is not None:
+                results[name] = (data, unit)
+
+    # --- Select depth
+    tdep_array, tdep_unit = next(((results[k][0], results[k][1]) for k in depth_keys if k in results), (None, None))
+    if tdep_array is None:
+        raise ValueError("No depth channel found")
+
+    if tdep_unit and (tdep_unit.endswith("in") or tdep_array[0] > 5000):
+        tdep_array = inch_to_meter(tdep_array)
+
+    # --- Select FMI image
+    fmi_array = next((results[k][0] for k in fmi_keys if k in results), None)
+    if fmi_array is None:
+        raise ValueError("No FMI image channel found")
+
+    # --- Select well radius (single channel or average)
+    if 'ASSOC_CAL' in results:
+        cal = results['ASSOC_CAL'][0]
+        if results['ASSOC_CAL'][1].endswith('in'):
+            cal = inch_to_meter(cal, radius=True)
+        well_radius = cal / 2
     else:
-        if tdep_array[0] > tdep_array[-1]:
-            fmi_array = fmi_array[::-1]
-            tdep_array = tdep_array[::-1]
-            well_radius = well_radius[::-1]
+        diameters = []
+        for k in caliper_keys[1:]:
+            if k in results:
+                d = results[k][0]
+                if results[k][1].endswith('in'):
+                    d = inch_to_meter(d, radius=True)
+                diameters.append(d)
+
+        if diameters:
+            # Memory-safe mean across axis=0
+            shape_ok = all(len(d) == len(diameters[0]) for d in diameters)
+            if not shape_ok:
+                raise ValueError("Caliper logs have mismatched lengths.")
+            well_radius = np.nanmean(np.vstack(diameters), axis=0) / 2
+        else:
+            raise ValueError("No valid caliper logs found.")
+
+    # --- Reverse logic
+    if reverse and tdep_array[0] < tdep_array[-1]:
+        fmi_array = fmi_array[::-1]
+        tdep_array = tdep_array[::-1]
+        well_radius = well_radius[::-1]
+    elif not reverse and tdep_array[0] > tdep_array[-1]:
+        fmi_array = fmi_array[::-1]
+        tdep_array = tdep_array[::-1]
+        well_radius = well_radius[::-1]
 
     return fmi_array, tdep_array, well_radius
+
 
 
 def get_data(data_path, dyn=False, reverse=False):

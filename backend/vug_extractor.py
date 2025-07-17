@@ -73,7 +73,7 @@ def extract_and_plot_contours(
             min_vug_area, max_vug_area, min_circ_ratio, max_circ_ratio,
             save_path=save_path, save=True, depth=start_depth, picture_format="png"
         )
-    print(fig_path)
+    
     return fig_path
 
 def plotfmi(data_path: str,

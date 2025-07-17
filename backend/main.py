@@ -6,8 +6,8 @@ from vug_extractor import extract_and_plot_contours, plotfmi
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from pathlib import Path
-from helper import load_depth, load_and_scale, array_to_png
-from utils.data import get_data, get_mud_info
+from helper import load_depth, load_and_scale, array_to_png, array_to_png_batches_parallel
+from utils.data import get_data
 import io
 import numpy as np
 import pandas as pd
@@ -111,7 +111,8 @@ def plotfmi_handler():
             start_depth=DEPTH_VEC.min(),
             end_depth=DEPTH_VEC.max()
         )
-        png_bytes = array_to_png(fmi_array, tdep_array)
+        #png_bytes = array_to_png(fmi_array, tdep_array)
+        png_bytes = array_to_png_batches_parallel(fmi_array, tdep_array, batch_size=500)
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
     end_time = time.time()  
