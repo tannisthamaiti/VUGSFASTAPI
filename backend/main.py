@@ -11,6 +11,7 @@ from utils.data import get_data, get_mud_info
 import io
 import numpy as np
 import pandas as pd
+import time
 
 
 app = FastAPI()
@@ -72,6 +73,7 @@ def extractvugs(vug_request: VugRequest):
 @app.get("/plotfmi")
 def plotfmi_handler():
     """PNG heat-map of the full scaled FMI array."""
+    start_time = time.time()  
     data_path = Path("/app/well_files")
     MISSING_THRESHOLD = -5000
 
@@ -112,6 +114,10 @@ def plotfmi_handler():
         png_bytes = array_to_png(fmi_array, tdep_array)
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
+    end_time = time.time()  
+    duration = end_time - start_time
+    print(f"[TIMER] /plotfmi completed in {duration:.2f} seconds.")
+
 
     return StreamingResponse(io.BytesIO(png_bytes), media_type="image/png")
 
