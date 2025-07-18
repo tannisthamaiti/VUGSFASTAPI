@@ -331,7 +331,7 @@ def get_contours(
         approx = cv.approxPolyDP(contour, epsilon, True)
 
         if len(approx) < 3:
-            print(f"[DEBUG] Contour {idx}: Rejected — fewer than 3 points (len={len(approx)})")
+            #print(f"[DEBUG] Contour {idx}: Rejected — fewer than 3 points (len={len(approx)})")
             continue
 
         area = cv.contourArea(contour) * PIXEL_SCALE
@@ -341,23 +341,28 @@ def get_contours(
         circularity = area / area_enclosing if area_enclosing > 0 else 0
 
         if area_enclosing == 0:
-            print(f"[DEBUG] Contour {idx}: Rejected — enclosing area is zero")
+            #print(f"[DEBUG] Contour {idx}: Rejected — enclosing area is zero")
             continue
 
         if not (min_vug_area < area <= max_vug_area):
-            print(f"[DEBUG] Contour {idx}: Rejected — area={area:.4f} not in ({min_vug_area}, {max_vug_area})")
+            #print(f"[DEBUG] Contour {idx}: Rejected — area={area:.4f} not in ({min_vug_area}, {max_vug_area})")
             continue
 
         if not (min_circ_ratio <= circularity <= max_circ_ratio):
-            print(f"[DEBUG] Contour {idx}: Rejected — circularity={circularity:.4f} not in ({min_circ_ratio}, {max_circ_ratio})")
+            #print(f"[DEBUG] Contour {idx}: Rejected — circularity={circularity:.4f} not in ({min_circ_ratio}, {max_circ_ratio})")
             continue
 
         # ✅ Passed all filters
         print(f"[DEBUG] Contour {idx}: Accepted — area={area:.4f}, circularity={circularity:.4f}")
 
         circles.append(contour)
-        cx, cy = get_centeroid(contour)
-        centroids.append((cx, cy))
+        try:
+            cx, cy = get_centeroid(contour)
+            centroids.append((cx, cy))
+            print(f"[DEBUG] Centroid {idx}: cx={cx:.4f}, cy={cy:.4f}")
+        except Exception as e:
+            print(f"[ERROR] Contour {idx}: Failed to compute centroid — {e}")
+            continue
 
         depth_val = get_depth_from_pixel(
             val=height - cy,

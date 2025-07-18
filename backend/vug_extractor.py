@@ -2,7 +2,7 @@ import numpy as np
 from utils.data import get_data
 from utils.pre_processing import preprocessing, get_one_meter_fmi_and_GT
 from utils.vugs import extract_contours_multi_thresholded_fmi_after_area_circularity_filtering
-from utils.parallel_processing import plot_fmi_with_area_circularity_filtered_contours
+from utils.parallel_processing import plot_fmi_with_area_circularity_filtered_contours_parallel
 from utils.processing import get_mode_of_interest_from_image
 from os.path import join as pjoin
 import os
@@ -69,7 +69,7 @@ def extract_and_plot_contours(
 
     # Plot
     if plot:
-        fig_path=plot_fmi_with_area_circularity_filtered_contours(
+        fig_path=plot_fmi_with_area_circularity_filtered_contours_parallel(
     fmi_array_one_meter_zone=fmi_array_zone,
     fmi_array_unscaled_one_meter_zone=fmi_array_unscaled,
     different_thresholds=different_thresholds,

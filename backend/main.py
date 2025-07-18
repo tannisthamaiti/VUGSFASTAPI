@@ -57,8 +57,16 @@ def extractvugs(vug_request: VugRequest):
         filtered_depths = pd.read_csv("/app/well_files/tdep_array.csv", header=None).astype(float).values.squeeze()
         well_radius = pd.read_csv("/app/well_files/well_radius.csv", header=None).astype(float).values.squeeze()
         print(f"[INFO] FMI shape: {filtered_data.shape}, Depths: {filtered_depths.shape}")
+        
+        # start_depth = filtered_depths[10000]
+        # end_depth = filtered_depths[15000]
+        filtered_data=filtered_data[25000:150000]
+        filtered_unscaled_data[25000:150000]
+        well_radius=well_radius[25000:150000]
+        filtered_depths=filtered_depths[25000:150000]
         start_depth = filtered_depths.min()
         end_depth = filtered_depths.max()
+        print(f"[INFO] FMI shape: {filtered_data.shape}, Depths: {filtered_depths.shape}")
 
         # Perform contour extraction
         png_list = extract_and_plot_contours(
