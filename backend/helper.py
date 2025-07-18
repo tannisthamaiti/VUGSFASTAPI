@@ -59,7 +59,7 @@ def load_and_scale(array_input: np.ndarray) -> np.ndarray:
     Accepts a 2D NumPy array, replaces missing values, and returns
     a Min-Max scaled array with NaNs replaced by 0.
     """
-    print(array_input)
+    
     # arr = np.asarray(array_input, dtype=float)
     # arr[arr <= MISSING_THRESHOLD] = np.nan
 

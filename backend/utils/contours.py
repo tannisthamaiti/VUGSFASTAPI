@@ -306,84 +306,81 @@ def get_centeroid(cnt):
     return int(sum_x / length), int(sum_y / length)
 
 def get_contours(
-        thresold_img, depth_to, depth_from, radius, pix_len, min_vug_area = 1.2, 
-        max_vug_area = 10.28, min_circ_ratio=0.5, max_circ_ratio=1
+    thresold_img, depth_to, depth_from, radius, pix_len,
+    min_vug_area=1.2, max_vug_area=10.28,
+    min_circ_ratio=0.5, max_circ_ratio=1.0
 ):
     from utils.misc import get_depth_from_pixel
-    """Get contours from thresholded image
-    
-    Parameters
-    ----------
-    thresold_img : np.array
-        Thresholded image
-    depth_to : int
-        Depth to
-    depth_from : int
-        Depth from
-    radius : int
-        Radius
-    pix_len : int
-        1px == how much cm
-    min_vug_area : float, optional
-        Minimum vug area, by default 1.2
-    max_vug_area : float, optional
-        Maximum vug area, by default 10.28
-    min_circ_ratio : float, optional
-        Minimum circularity ratio, by default 0.5
-    max_circ_ratio : float, optional
-        Maximum circularity ratio, by default 1
 
-    Returns
-    -------
-    contours : list
-        List of contours
-    centroids : list
-        List of centroids
-    vugg : list
-        List of vuggs
-    """
     height, width = thresold_img.shape
-    contours, _ = cv.findContours(thresold_img, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE, )
+    contours, _ = cv.findContours(thresold_img, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+
+    print(f"[DEBUG] Total raw contours detected: {len(contours)}")
+
     circles = []
     centroids = []
-    ix = 1          
     total_vugg = []
+    ix = 1          
+
     HOLE_R = radius
     PIXEL_LEN = pix_len
-    PIXLE_SCALE = np.radians(1) * HOLE_R * PIXEL_LEN 
-    for _, contour in enumerate(contours):
+    PIXEL_SCALE = np.radians(1) * HOLE_R * PIXEL_LEN 
+
+    for idx, contour in enumerate(contours):
         epsilon = 0.01 * cv.arcLength(contour, True)
         approx = cv.approxPolyDP(contour, epsilon, True)
-        area = cv.contourArea(contour) * PIXLE_SCALE
-        (x,y), radius = cv.minEnclosingCircle(contour)
-        center = (int(x),int(y))
-        radius = int(radius)
-        area_enclosing = np.pi * radius**2 * PIXLE_SCALE
+
+        if len(approx) < 3:
+            print(f"[DEBUG] Contour {idx}: Rejected — fewer than 3 points (len={len(approx)})")
+            continue
+
+        area = cv.contourArea(contour) * PIXEL_SCALE
+        (x, y), enclosing_radius = cv.minEnclosingCircle(contour)
+        enclosing_radius = int(enclosing_radius)
+        area_enclosing = np.pi * enclosing_radius ** 2 * PIXEL_SCALE
+        circularity = area / area_enclosing if area_enclosing > 0 else 0
+
         if area_enclosing == 0:
-            continue  # or use a small epsilon like: area_enclosing = 1e-6
-        
-        if len(approx) >= 3 and \
-                min_vug_area < area <= max_vug_area and \
-                min_circ_ratio <= (area/area_enclosing) <= max_circ_ratio:
-            circles.append(contour)
-            centroids.append(get_centeroid(contour))
-            y = get_centeroid(contour)[1]
-            x = get_centeroid(contour)[0]
-            ix +=1
-            vugg = {'id':ix, 
-                    'area': area, 
-                    'depth': get_depth_from_pixel(
-                        val=height-y, scaled_max=depth_to, 
-                        scaled_min=depth_from, raw_max=height
-                    ), 
-                    'centroid_x':x, 
-                    'centroid_y': y,
-                    'contour': contour,
-                    'circularity': area/area_enclosing,
-                    'hole_radius': HOLE_R,
-                    'pix_len': PIXEL_LEN
-                    }
-            total_vugg.append(vugg)
+            print(f"[DEBUG] Contour {idx}: Rejected — enclosing area is zero")
+            continue
+
+        if not (min_vug_area < area <= max_vug_area):
+            print(f"[DEBUG] Contour {idx}: Rejected — area={area:.4f} not in ({min_vug_area}, {max_vug_area})")
+            continue
+
+        if not (min_circ_ratio <= circularity <= max_circ_ratio):
+            print(f"[DEBUG] Contour {idx}: Rejected — circularity={circularity:.4f} not in ({min_circ_ratio}, {max_circ_ratio})")
+            continue
+
+        # ✅ Passed all filters
+        print(f"[DEBUG] Contour {idx}: Accepted — area={area:.4f}, circularity={circularity:.4f}")
+
+        circles.append(contour)
+        cx, cy = get_centeroid(contour)
+        centroids.append((cx, cy))
+
+        depth_val = get_depth_from_pixel(
+            val=height - cy,
+            scaled_max=depth_to,
+            scaled_min=depth_from,
+            raw_max=height
+        )
+
+        vugg = {
+            'id': ix,
+            'area': area,
+            'depth': depth_val,
+            'centroid_x': cx,
+            'centroid_y': cy,
+            'contour': contour,
+            'circularity': circularity,
+            'hole_radius': HOLE_R,
+            'pix_len': PIXEL_LEN
+        }
+        total_vugg.append(vugg)
+        ix += 1
+
+    print(f"[INFO] Total vugs accepted: {len(total_vugg)}")
     return circles, centroids, total_vugg
 
 def group_overlapping_or_inside_contours(contours, threshold=0.2):

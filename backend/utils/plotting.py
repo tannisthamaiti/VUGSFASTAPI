@@ -447,41 +447,7 @@ def plot_fmi_with_area_circularity_filtered_contours(
             mode_subtracted_fmi, contours, ax, linewidth=2, cmap='YlOrBr', 
             colorbar=False, fontsize=fontsize, labelsize=labelsize
         )
-    # threshold = different_thresholds
-    # threshold_img, _ = apply_adaptive_thresholding(
-    #     fmi_array_one_meter_zone, threshold, block_size=block_size, c=c_threshold
-    # )
-
-    # contours, _, _ = get_contours(
-    #         threshold_img,
-    #         depth_to=one_meter_zone_start,
-    #         depth_from=one_meter_zone_end,
-    #         radius=hole_radius_cm,
-    #         pix_len=pixel_length_cm,
-    #         min_vug_area=min_vug_area,
-    #         max_vug_area=max_vug_area,
-    #         min_circ_ratio=min_circ_ratio,
-    #         max_circ_ratio=max_circ_ratio
-    #     )
-
-    # mode_subtracted_fmi = np.abs(fmi_array_one_meter_zone - threshold)
-    # height_per_row = 0.004
-    # fig_height = max(6, tdep_array_one_meter_zone.shape[0] * height_per_row)
-    # fig_width = 6
-    # fig, ax = plt.subplots(1, 1, figsize=(fig_width, fig_height), dpi=150)
-    # plot_single_image_contours(
-    #         mode_subtracted_fmi,
-    #         contours,
-    #         ax,
-    #         linewidth=2,
-    #         cmap='YlOrBr',
-    #         colorbar=colorbar,
-    #         fontsize=fontsize,
-    #         labelsize=labelsize
-    #     )
     
-    # ax.set_title(f'Contours (Threshold: {f"{threshold:.1f}"})', fontsize=fontsize)
-    #ax.get_yaxis().set_visible(False)
     ax.set_xticks(np.linspace(0, fmi_array_one_meter_zone.shape[1], 5))
     yticks_idx = np.linspace(0, len(tdep_array_one_meter_zone) - 1, 5, dtype=int)
     ytick_vals = tdep_array_one_meter_zone[yticks_idx]
