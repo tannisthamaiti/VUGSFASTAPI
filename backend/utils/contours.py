@@ -353,13 +353,13 @@ def get_contours(
             continue
 
         # ✅ Passed all filters
-        print(f"[DEBUG] Contour {idx}: Accepted — area={area:.4f}, circularity={circularity:.4f}")
+        #print(f"[DEBUG] Contour {idx}: Accepted — area={area:.4f}, circularity={circularity:.4f}")
 
         circles.append(contour)
         try:
             cx, cy = get_centeroid(contour)
             centroids.append((cx, cy))
-            print(f"[DEBUG] Centroid {idx}: cx={cx:.4f}, cy={cy:.4f}")
+            #print(f"[DEBUG] Centroid {idx}: cx={cx:.4f}, cy={cy:.4f}")
         except Exception as e:
             print(f"[ERROR] Contour {idx}: Failed to compute centroid — {e}")
             continue

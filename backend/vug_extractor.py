@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 def extract_and_plot_contours(
     data_path: str,
-    data_path_unscaled: str,
+    #data_path_unscaled: str,
     depth_path: str,
     well_radius: str,
     start_depth: float,
@@ -27,7 +27,7 @@ def extract_and_plot_contours(
     
 
     fmi_array=data_path
-    fmi_array_unscaled=data_path_unscaled
+    #fmi_array_unscaled=data_path_unscaled
     tdep_array = depth_path
     well_radius = well_radius
     start = start_depth
@@ -53,25 +53,13 @@ def extract_and_plot_contours(
     different_thresholds, count_of_different_thresholds = get_mode_of_interest_from_image(fmi_array_zone, 5, 5)
     print(f"[INFO] threshold: {different_thresholds}")
 
-    # # Extract vug contours
-    # outputs = extract_contours_multi_thresholded_fmi_after_area_circularity_filtering(
-    #     fmi_array_zone, tdep_array_zone, well_radius_zone, start_depth, end_depth,
-    #     different_thresholds, block_size, c_threshold,
-    #     min_vug_area, max_vug_area, min_circ_ratio, max_circ_ratio,
-    #     centroid_threshold, print_duplicates_info=False
-    # )
-
-    # final_contours, final_vugs, _, _, _, _ = outputs
-    # save_path="."
-    # # Save path
-    # os.makedirs(save_path, exist_ok=True)
-    # fig_path = pjoin(save_path, f"vugs_{start_depth:.1f}_{end_depth:.1f}.png")
+    
 
     # Plot
     if plot:
         fig_path=plot_fmi_with_area_circularity_filtered_contours_parallel(
     fmi_array_one_meter_zone=fmi_array_zone,
-    fmi_array_unscaled_one_meter_zone=fmi_array_unscaled,
+    #fmi_array_unscaled_one_meter_zone=fmi_array_unscaled,
     different_thresholds=different_thresholds,
     block_size=block_size,
     c_threshold=c_threshold,

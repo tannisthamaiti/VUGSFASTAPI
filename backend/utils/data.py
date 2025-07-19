@@ -186,9 +186,10 @@ def get_data(data_path, dyn=False, reverse=False):
     logical_file = get_logical_file(dlis_file_name, data_path, dyn=dyn)
     fmi_array, tdep_array, well_radius = get_fmi_with_depth_and_radius(logical_file, dyn=dyn, reverse=reverse)
 
-    gt_path = [i for i in os.listdir(data_path) if i.endswith('.csv')][0]
-    gt = pd.read_csv(pjoin(data_path, gt_path)).dropna()[1:].astype('float')
-    return fmi_array, tdep_array, well_radius, gt
+    #gt_path = [i for i in os.listdir(data_path) if i.endswith('.csv')][0]
+    #gt = pd.read_csv(pjoin(data_path, gt_path)).dropna()[1:].astype('float')
+    #return fmi_array, tdep_array, well_radius, gt
+    return fmi_array, tdep_array, well_radius
 
 def get_mud_info(data_path, dyn):
     dlis_file_name = [i for i in os.listdir(data_path) if i.lower().endswith('.dlis')]
