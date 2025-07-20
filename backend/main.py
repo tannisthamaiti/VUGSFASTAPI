@@ -10,7 +10,7 @@ def setup():
 
 setup()
 
-from fastapi import FastAPI, Query, HTTPException, Depends
+from fastapi import FastAPI, Query, HTTPException, Depends,Body
 from fastapi.responses import FileResponse, StreamingResponse,HTMLResponse
 from pydantic import BaseModel
 import os
@@ -18,7 +18,7 @@ from vug_extractor import extract_and_plot_contours, plotfmi
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from pathlib import Path
-from helper import load_depth, load_and_scale, array_to_png, array_to_png_batches_parallel
+from helper import array_to_png, array_to_png_batches_parallel,save_contours_to_csv
 from utils.data import get_data
 import io
 import numpy as np
@@ -44,10 +44,10 @@ app.add_middleware(
 
 class VugRequest(BaseModel):
     
-    min_vug_area: float = Field(..., ge=0, description="Minimum vug area")
-    max_vug_area: float = Field(..., ge=0, description="Maximum vug area")
-    min_circ_ratio: float = Field(..., ge=0, description="Minimum circularity ratio")
-    max_circ_ratio: float = Field(..., ge=0, description="Maximum circularity ratio")
+    min_vug_area: float = 0.5
+    max_vug_area: float = 10.0
+    min_circ_ratio: float = 0.5
+    max_circ_ratio: float = 2.0
 
 from fastapi import HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -58,7 +58,7 @@ from pathlib import Path
 
 @app.post("/extract-vugs/")
 def extractvugs(
-    vug_request: VugRequest,
+    vug_request: VugRequest = Body(default=VugRequest()),
     sha_short: str = Query(..., description="Short SHA ID (first 8 chars)"),
     timestamp: str = Query(..., description="UTC timestamp in format YYYYMMDDTHHMMSSZ")
 ):
@@ -82,22 +82,21 @@ def extractvugs(
     try:
         # Load required data
         filtered_data = pd.read_csv(fmi_csv, header=None).astype(float).values
-        #filtered_unscaled_data = pd.read_csv(unscaled_csv, header=None).astype(float).values
         filtered_depths = pd.read_csv(tdep_csv, header=None).astype(float).values.squeeze()
         well_radius = pd.read_csv(radius_csv, header=None).astype(float).values.squeeze()
 
         print(f"[INFO] Loaded shapes — FMI: {filtered_data.shape}, Depths: {filtered_depths.shape}")
 
         # Optional slicing for performance or testing
-        # filtered_data = filtered_data[25000:150000]
-        # filtered_depths = filtered_depths[25000:150000]
-        # well_radius = well_radius[25000:150000]
+        # filtered_data = filtered_data[25000:26000]
+        # filtered_depths = filtered_depths[25000:26000]
+        # well_radius = well_radius[25000:26000]
 
         start_depth = filtered_depths.min()
         end_depth = filtered_depths.max()
 
         # Extract and plot vugs
-        png_list = extract_and_plot_contours(
+        png_list,contour_csv = extract_and_plot_contours(
             data_path=filtered_data,
             depth_path=filtered_depths,
             well_radius=well_radius,
@@ -111,6 +110,8 @@ def extractvugs(
 
         if not png_list:
             raise ValueError("No vug plots were generated.")
+        
+        save_contours_to_csv(contour_csv, sha_short, timestamp)
 
         return StreamingResponse(io.BytesIO(png_list[0]), media_type="image/png")
 
@@ -126,7 +127,8 @@ def extractvugs(
 def plotfmi_handler(
     request: Request,
     response: Response,
-    x_metadata: str = Header(...)
+    x_metadata: str = Header(...),
+    timestamp: str = Header(..., description="UTC timestamp in format YYYYMMDDTHHMMSSZ")
 ):
     """
     PNG heat-map of the full scaled FMI array with SHA256-based tracking and UTC timestamp.
@@ -143,7 +145,8 @@ def plotfmi_handler(
     # === Step 2: Compute SHA256 and timestamp ===
     sha_full = hashlib.sha256(x_metadata.encode()).hexdigest()
     sha_short = sha_full[:8]
-    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")  # Safe, short ISO-like
+    #timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")  # Safe, short ISO-like
+    timestamp = timestamp
     response.headers["X-Metadata-SHA256"] = sha_full
     response.headers["X-Server-Timestamp"] = timestamp
     print(f"[INFO] SHA256: {sha_full}, Short: {sha_short}, Timestamp: {timestamp}")
@@ -154,7 +157,7 @@ def plotfmi_handler(
     metadata_log_path = data_path / "metadata_log.csv"
 
     try:
-        fmi_array, tdep_array, well_radius = get_data(data_path, dyn=True)
+        fmi_array, tdep_array, well_radius = get_data(data_path, dyn=False)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=f"Data missing: {e}")
 
@@ -179,7 +182,6 @@ def plotfmi_handler(
 
         # === Step 5: Save CSVs with short hash + timestamp in name ===
         fmi_csv = data_path / f"fmi_array_{sha_short}_{timestamp}.csv"
-        #unscaled_csv = data_path / f"fmi_array_unscaled_{sha_short}_{timestamp}.csv"
         tdep_csv = data_path / f"tdep_array_{sha_short}_{timestamp}.csv"
         radius_csv = data_path / f"well_radius_{sha_short}_{timestamp}.csv"
 

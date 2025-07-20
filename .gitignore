@@ -8,7 +8,8 @@ __pycache__/
 # Ignore well_files directory
 well_files/
 5_fmi_contour_area_circularity_filtered_.png
-
+Sh R-1H1_PROCFMISTAT_SLB_26NOV2021FMI_HD_3808-9620ft.dlis
+SH H-14_PROCFMIDYN_SLB_26NOV2021.dlis
 # Ignore common Python artifacts
 *.pyc
 *.pyo

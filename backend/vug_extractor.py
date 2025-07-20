@@ -35,10 +35,6 @@ def extract_and_plot_contours(
     
 
     
-    # Preprocess
-    #fmi_array_doi_unscaled, fmi_array_doi, tdep_array_doi, well_radius_doi = preprocessing(
-    #    fmi_array, tdep_array, well_radius, start, end, scale_individual_patch=True
-    #)
 
     # Mask zone of interest
     outputs = get_one_meter_fmi_and_GT(
@@ -57,7 +53,7 @@ def extract_and_plot_contours(
 
     # Plot
     if plot:
-        fig_path=plot_fmi_with_area_circularity_filtered_contours_parallel(
+        fig_path,contour_csv=plot_fmi_with_area_circularity_filtered_contours_parallel(
     fmi_array_one_meter_zone=fmi_array_zone,
     #fmi_array_unscaled_one_meter_zone=fmi_array_unscaled,
     different_thresholds=different_thresholds,
@@ -82,7 +78,7 @@ def extract_and_plot_contours(
     well_name="")
     
     
-    return fig_path
+    return fig_path, contour_csv
 
 def plotfmi(data_path: str,
     depth_path: str,

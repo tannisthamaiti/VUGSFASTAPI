@@ -4,6 +4,7 @@ helper.py – utilities for depth-aware FMI plotting
 from __future__ import annotations
 
 import io
+import os
 from pathlib import Path
 
 import matplotlib
@@ -46,30 +47,6 @@ MISSING_THRESHOLD = -5000         # ≤ −5000 → missing / NaN
 
 
 MISSING_THRESHOLD = -998.0  # or your defined threshold
-
-def load_depth(depth_input: np.ndarray) -> np.ndarray:
-    """
-    Accepts a NumPy array and returns a 1D float64 depth vector.
-    """
-    return depth_input
-
-
-def load_and_scale(array_input: np.ndarray) -> np.ndarray:
-    """
-    Accepts a 2D NumPy array, replaces missing values, and returns
-    a Min-Max scaled array with NaNs replaced by 0.
-    """
-    
-    # arr = np.asarray(array_input, dtype=float)
-    # arr[arr <= MISSING_THRESHOLD] = np.nan
-
-    # col_min = np.nanmin(arr, axis=0, keepdims=True)
-    # col_max = np.nanmax(arr, axis=0, keepdims=True)
-    # scaled  = (arr - col_min) / (col_max - col_min)
-
-    #return np.nan_to_num(scaled, nan=0.0)
-    return array_input
-
 
 
 # ─── rendering ─────────────────────────────────────────────────────────
@@ -178,3 +155,37 @@ def array_to_png_batches_parallel(arr: np.ndarray, depth: np.ndarray, batch_size
     final_buf.seek(0)
     return final_buf.read()
 
+
+def save_contours_to_csv(contour_csv_outputs, sha_short, timestamp, directory="/app/well_files"):
+    """
+    Flatten and save contour data (x, depth_m) to a CSV file with sha and timestamp in filename.
+
+    Parameters:
+    - contour_csv_outputs: List of lists of dicts (contour points).
+    - sha_short: Short SHA string to uniquely identify the file.
+    - timestamp: UTC timestamp string in format YYYYMMDDTHHMMSSZ.
+    - directory: Output directory path. Default is '/app/well_files'.
+
+    Returns:
+    - full_path: The path where the CSV was saved.
+    """
+    all_contour_points = []
+
+    for contour_list in contour_csv_outputs:
+        for point in contour_list:
+            all_contour_points.append({
+                "contour_id": point["contour_id"],
+                "x": int(point["x"]),
+                "depth_m": float(point["depth_m"])
+            })
+
+    df = pd.DataFrame(all_contour_points)
+
+    # Build the output path
+    filename = f"/app/well_files/vug_contours_{sha_short}_{timestamp}.csv"
+    full_path = os.path.join(directory, filename)
+
+    df.to_csv(full_path, index=False)
+    print(f"[INFO] Saved {len(all_contour_points)} contour points to {full_path}")
+
+    return full_path
