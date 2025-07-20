@@ -9,11 +9,99 @@ from utils.processing import apply_adaptive_thresholding
 import os
 #from multiprocessing import Pool, cpu_count
 from multiprocessing import get_context, cpu_count
+import plotly.graph_objs as go
+import plotly.io as pio
 
 def create_colorbar(ax, im, fontsize=12):
     cbar = plt.colorbar(im, ax=ax, orientation='horizontal', pad=0.2)
     cbar.ax.tick_params(labelsize=fontsize)
     cbar.set_label("Scaled Intensity", fontsize=fontsize)
+
+
+def calculate_contour_area(contour, well_radius_cm, img_width_px, pix_len_cm):
+    if contour.ndim == 3:
+        contour = contour[:, 0, :]
+
+    theta_per_pixel = 2 * np.pi * well_radius_cm / img_width_px
+    x_cm = contour[:, 0] * theta_per_pixel
+    y_cm = contour[:, 1] * pix_len_cm
+
+    area = 0.5 * np.abs(np.dot(x_cm, np.roll(y_cm, -1)) - np.dot(y_cm, np.roll(x_cm, -1)))
+    return area
+
+def plot_single_image_contours_plotly(
+    img, circles, linewidth=2, cmap='YlOrBr', color='black',
+    legend=False, colorbar=False, title='', fontsize=12, labelsize=12,
+    axis_off=False, depth_vector=None,
+    well_radius_cm=10.0, pix_len_cm=0.05  # Required for area computation
+):
+    all_contour_points = []
+
+    fig = go.Figure()
+
+    # Add FMI image
+    fig.add_trace(go.Heatmap(
+        z=img,
+        colorscale=cmap,
+        showscale=colorbar,
+        zmin=np.percentile(img, 1),
+        zmax=np.percentile(img, 99),
+        hoverinfo="skip",
+        colorbar=dict(title="Intensity", tickfont=dict(size=labelsize))
+    ))
+
+    # Add contours
+    for i, pts in enumerate(circles):
+        x = pts[:, 0, 0]
+        y = pts[:, 0, 1]
+        x = np.append(x, x[0])
+        y = np.append(y, y[0])
+
+        # Convert y-pixels to depth
+        y_depth = depth_vector[y.astype(int)]
+
+        # Calculate area (using simplified assumption)
+        area = calculate_contour_area(pts, well_radius_cm, img.shape[1], pix_len_cm)
+
+        hover_text = f"Contour {i}<br>Area: {area:.2f} cm²"
+
+        fig.add_trace(go.Scatter(
+            x=x,
+            y=y_depth,
+            mode='lines',
+            line=dict(color=color, width=linewidth),
+            name=f"Contour {i}" if legend else None,
+            hoverinfo='text',
+            text=hover_text
+        ))
+
+        for xi, yi in zip(x, y_depth):
+            all_contour_points.append({"contour_id": i, "x": xi, "depth_m": yi, "area_cm2": area})
+
+    # Set axis labels and orientation
+    fig.update_layout(
+        title=title,
+        xaxis_title="Column Index",
+        yaxis_title="Depth (m)",
+        yaxis=dict(autorange="reversed"),
+        font=dict(size=fontsize),
+        showlegend=legend,
+        margin=dict(l=40, r=40, t=40, b=40)
+    )
+
+    if axis_off:
+        fig.update_xaxes(visible=False)
+        fig.update_yaxes(visible=False)
+
+    # Optional: add y-axis ticks at each meter
+    start_tick = int(np.ceil(depth_vector[0]))
+    end_tick = int(np.floor(depth_vector[-1]))
+    fig.update_yaxes(tickvals=np.arange(start_tick, end_tick + 1, 1))
+
+    # Return HTML
+    html = pio.to_html(fig, full_html=True, include_plotlyjs="cdn")
+
+    return html, all_contour_points
 
 def plot_single_image_contours(
         img, circles, linewidth=2, cmap='YlOrBr', color='black',
@@ -129,6 +217,18 @@ def process_single_threshold(args):
             depth_vector=tdep_array
            
         )
+
+        # html, contour_csv = plot_single_image_contours_plotly(
+        #     img=fmi_array,
+        #     circles=contours,
+        #     depth_vector=tdep_array,
+        #     title="FMI Contours",
+        #     well_radius_cm=10,
+        #     pix_len_cm=0.05
+        # )
+        # #return HTMLResponse(content=html)
+        # assert isinstance(html, str), "Expected HTML string output"
+        # assert isinstance(contour_csv, list), "Expected list of contour points"
         return png ,contour_csv
 
     except Exception as e:
@@ -182,14 +282,28 @@ def plot_fmi_with_area_circularity_filtered_contours_parallel(
     with get_context("spawn").Pool(processes=min(len(different_thresholds), cpu_count())) as pool:
     # with Pool(processes=min(len(different_thresholds), cpu_count())) as pool:
         results = pool.map(process_single_threshold, args_list)
-    print(f"[INFO]: filter none results")
-    # Filter out None results
-    # Filter out None results first
+        print(f"[INFO] Completed multiprocessing map.")
+   
     valid_results = [r for r in results if r is not None]
+    if not valid_results:
+        print("[WARNING] No valid contour results found.")
+        return [], []
+
     png_outputs, contour_csv_outputs = zip(*valid_results)
+    print(f"[INFO] Total HTML outputs: {len(png_outputs)}")
+
+    return png_outputs, contour_csv_outputs
+    # print(f"[INFO]: filter none results")
+    # # Filter out None results
+    # # Filter out None results first
+    # valid_results = [r for r in results if r is not None]
+    # #png_outputs, contour_csv_outputs = zip(*valid_results)
+    # html_outputs, contour_csv_outputs = zip(*valid_results)
     
 
-    print(f"[INFO] Total PNG images generated: {len(png_outputs)}")
-    return png_outputs,contour_csv_outputs
+    # #print(f"[INFO] Total PNG images generated: {len(png_outputs)}")
+    # print(f"[INFO] Total HTML images generated: {len(html_outputs)}")
+    # #return png_outputs,contour_csv_outputs
+    # return html_outputs, contour_csv_outputs
 
 

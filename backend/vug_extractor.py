@@ -27,7 +27,6 @@ def extract_and_plot_contours(
     
 
     fmi_array=data_path
-    #fmi_array_unscaled=data_path_unscaled
     tdep_array = depth_path
     well_radius = well_radius
     start = start_depth
@@ -42,8 +41,7 @@ def extract_and_plot_contours(
     )
     
     fmi_array_zone, tdep_array_zone, well_radius_zone, mask = outputs
-    #fmi_array_unscaled = fmi_array_doi_unscaled[mask]
-
+   
     # Thresholds
     different_thresholds = [np.median(fmi_array_zone)]  # simplified threshold for demo
     different_thresholds, count_of_different_thresholds = get_mode_of_interest_from_image(fmi_array_zone, 5, 5)
@@ -55,7 +53,6 @@ def extract_and_plot_contours(
     if plot:
         fig_path,contour_csv=plot_fmi_with_area_circularity_filtered_contours_parallel(
     fmi_array_one_meter_zone=fmi_array_zone,
-    #fmi_array_unscaled_one_meter_zone=fmi_array_unscaled,
     different_thresholds=different_thresholds,
     block_size=block_size,
     c_threshold=c_threshold,
@@ -77,8 +74,19 @@ def extract_and_plot_contours(
     figsize=(6, 6),
     well_name="")
     
-    
+    # print(f"[DEBUG] Type of fig_list: {type(fig_path)}")
+    # if not isinstance(fig_path, (list, tuple)):
+    #     raise TypeError(f"[ERROR] fig_path is not a list or tuple, got: {type(fig_path)}")
+
+    # for i, item in enumerate(fig_path):
+    #     if not isinstance(item, str):
+    #         raise TypeError(f"[ERROR] fig_path[{i}] is not a string (HTML), got: {type(item)}")
+    #     if "<html" not in item.lower() and "plotly" not in item.lower():
+    #         raise ValueError(f"[ERROR] fig_path[{i}] does not appear to be valid HTML content.")
+
     return fig_path, contour_csv
+    
+    
 
 def plotfmi(data_path: str,
     depth_path: str,

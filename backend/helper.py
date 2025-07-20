@@ -189,3 +189,31 @@ def save_contours_to_csv(contour_csv_outputs, sha_short, timestamp, directory="/
     print(f"[INFO] Saved {len(all_contour_points)} contour points to {full_path}")
 
     return full_path
+
+def calculate_contour_area(contour, well_radius_cm, img_width_px, pix_len_cm):
+    """
+    Calculate area of a single contour using real-world dimensions.
+
+    Parameters:
+    - contour: numpy array of shape (N, 1, 2) or (N, 2)
+    - well_radius_cm: float, well radius in cm
+    - img_width_px: int, image width in pixels
+    - pix_len_cm: float, pixel height (vertical) in cm
+
+    Returns:
+    - area_cm2: float, contour area in square cm
+    """
+    # Ensure shape (N, 2)
+    if contour.ndim == 3:
+        contour = contour[:, 0, :]
+
+    # Convert pixel x to arc length (cm)
+    theta_per_pixel = 2 * np.pi * well_radius_cm / img_width_px
+    x_cm = contour[:, 0] * theta_per_pixel
+
+    # Convert pixel y to vertical position (cm)
+    y_cm = contour[:, 1] * pix_len_cm
+
+    # Shoelace formula
+    area = 0.5 * np.abs(np.dot(x_cm, np.roll(y_cm, -1)) - np.dot(y_cm, np.roll(x_cm, -1)))
+    return area

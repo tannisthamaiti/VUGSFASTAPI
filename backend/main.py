@@ -88,9 +88,9 @@ def extractvugs(
         print(f"[INFO] Loaded shapes — FMI: {filtered_data.shape}, Depths: {filtered_depths.shape}")
 
         # Optional slicing for performance or testing
-        # filtered_data = filtered_data[25000:26000]
-        # filtered_depths = filtered_depths[25000:26000]
-        # well_radius = well_radius[25000:26000]
+        filtered_data = filtered_data[25000:26000]
+        filtered_depths = filtered_depths[25000:26000]
+        well_radius = well_radius[25000:26000]
 
         start_depth = filtered_depths.min()
         end_depth = filtered_depths.max()
@@ -114,6 +114,7 @@ def extractvugs(
         save_contours_to_csv(contour_csv, sha_short, timestamp)
 
         return StreamingResponse(io.BytesIO(png_list[0]), media_type="image/png")
+        #return HTMLResponse(content=png_list)
 
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=f"Required file not found: {e}")
