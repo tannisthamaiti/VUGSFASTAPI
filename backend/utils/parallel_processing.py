@@ -18,16 +18,7 @@ def create_colorbar(ax, im, fontsize=12):
     cbar.set_label("Scaled Intensity", fontsize=fontsize)
 
 
-def calculate_contour_area(contour, well_radius_cm, img_width_px, pix_len_cm):
-    if contour.ndim == 3:
-        contour = contour[:, 0, :]
 
-    theta_per_pixel = 2 * np.pi * well_radius_cm / img_width_px
-    x_cm = contour[:, 0] * theta_per_pixel
-    y_cm = contour[:, 1] * pix_len_cm
-
-    area = 0.5 * np.abs(np.dot(x_cm, np.roll(y_cm, -1)) - np.dot(y_cm, np.roll(x_cm, -1)))
-    return area
 
 def plot_single_image_contours_plotly(
     img, circles, linewidth=2, cmap='YlOrBr', color='black',
@@ -61,7 +52,7 @@ def plot_single_image_contours_plotly(
         y_depth = depth_vector[y.astype(int)]
 
         # Calculate area (using simplified assumption)
-        area = calculate_contour_area(pts, well_radius_cm, img.shape[1], pix_len_cm)
+        #area = calculate_contour_area(pts, well_radius_cm, img.shape[1], pix_len_cm)
 
         hover_text = f"Contour {i}<br>Area: {area:.2f} cm²"
 
@@ -119,6 +110,8 @@ def plot_single_image_contours(
     im = ax.imshow(img, cmap=cmap,aspect="auto", extent=extent)
     ### save contours ####
     all_contour_points = []
+    well_radius_cm=10,
+    pix_len_cm=0.05
     for i, pts in enumerate(circles):
         x = pts[:, 0, 0]
         y = pts[:, 0, 1]
@@ -133,10 +126,21 @@ def plot_single_image_contours(
             legend_label = legend
         else:
             legend_label = None
-
+        
         ax.plot(x, y, color=color, linewidth=linewidth, label=legend_label)
-        for xi, yi in zip(x, y):
-            all_contour_points.append({"contour_id": i, "x": xi, "depth_m": yi})
+        # Calculate area (using simplified assumption)
+        # try:
+        #     contour_array = np.array(pts, dtype=float)
+        #     area = calculate_contour_area(contour_array, well_radius_cm, img.shape[1], pix_len_cm)
+        # except Exception as e:
+        #     print(f"[ERROR] Failed to compute area for contour {i}: {e}")
+        # for xi, yi in zip(x, y):
+        #     all_contour_points.append({"contour_id": i, "x": xi, "depth_m": yi})
+        all_contour_points.append({
+    "contour_id": i,
+    "x": list(x.astype(int)),                    # convert np.array to regular list
+    "depth_m": [round(float(d), 5) for d in y]   # convert and round
+    })
     ax.set_ylabel("Depth (m)")
     start_tick = int(np.ceil(depth_vector[0]))
     end_tick = int(np.floor(depth_vector[-1]))
@@ -199,6 +203,7 @@ def process_single_threshold(args):
             min_circ_ratio=min_circ_ratio,
             max_circ_ratio=max_circ_ratio
         )
+        #print(f"[INFO] VUGS: {vugs['area']}")
 
         if len(contours) == 0:
             print(f"[WARNING] No contours at threshold {diff_thresh:.2f}")
@@ -290,7 +295,7 @@ def plot_fmi_with_area_circularity_filtered_contours_parallel(
         return [], []
 
     png_outputs, contour_csv_outputs = zip(*valid_results)
-    print(f"[INFO] Total HTML outputs: {len(png_outputs)}")
+    print(f"[INFO] Total PNG outputs: {len(png_outputs)}")
 
     return png_outputs, contour_csv_outputs
     # print(f"[INFO]: filter none results")

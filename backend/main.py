@@ -88,9 +88,9 @@ def extractvugs(
         print(f"[INFO] Loaded shapes — FMI: {filtered_data.shape}, Depths: {filtered_depths.shape}")
 
         # Optional slicing for performance or testing
-        filtered_data = filtered_data[25000:26000]
-        filtered_depths = filtered_depths[25000:26000]
-        well_radius = well_radius[25000:26000]
+        # filtered_data = filtered_data[25000:26000]
+        # filtered_depths = filtered_depths[25000:26000]
+        # well_radius = well_radius[25000:26000]
 
         start_depth = filtered_depths.min()
         end_depth = filtered_depths.max()
