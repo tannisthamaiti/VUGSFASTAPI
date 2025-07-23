@@ -167,11 +167,15 @@ def save_contours_to_csv(contour_csv_outputs, sha_short, timestamp, directory="/
             contour_id = int(contour["contour_id"])
             x_list = [int(x) for x in contour["x"]]  # Convert np.int64 to int
             y_list = [float(y) for y in contour["depth_m"]]  # Convert np.float64 to float
+            area = float(contour["area"])
+            hole_radius=float(contour["hole_radius"])
 
             all_contour_rows.append({
                 "contour_id": contour_id,
                 "x": x_list,
-                "depth_m": y_list
+                "depth_m": y_list,
+                "area": area,
+                "hole_radius": hole_radius
             })
 
     df = pd.DataFrame(all_contour_rows)

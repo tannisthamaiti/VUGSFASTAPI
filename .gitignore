@@ -9,6 +9,7 @@ __pycache__/
 well_files/
 5_fmi_contour_area_circularity_filtered_.png
 Sh R-1H1_PROCFMISTAT_SLB_26NOV2021FMI_HD_3808-9620ft.dlis
+ANAN-1H1_8in_processedFMI_1930-2038m MD_19Dec_SLB.dlis
 SH H-14_PROCFMIDYN_SLB_26NOV2021.dlis
 # Ignore common Python artifacts
 *.pyc

@@ -95,7 +95,7 @@ def plot_single_image_contours_plotly(
     return html, all_contour_points
 
 def plot_single_image_contours(
-        img, circles, linewidth=2, cmap='YlOrBr', color='black',
+        img, circles,vugs, linewidth=2, cmap='YlOrBr', color='black',
         legend=False, colorbar=False, title='', fontsize=12, labelsize=12,
         axis_off=False, depth_vector=None
 ):
@@ -118,7 +118,7 @@ def plot_single_image_contours(
         x = np.append(x, x[0])
         y = np.append(y, y[0])
         y = depth_vector[y.astype(int)]  # convert pixel row to depth
-        print(f"[DEBUG] Contour {i}: x = {x}, y = {y}")
+        #print(f"[DEBUG] Contour {i}: x = {x}, y = {y}")
 
         if isinstance(legend, bool) and legend:
             legend_label = str(i)
@@ -128,6 +128,8 @@ def plot_single_image_contours(
             legend_label = None
         
         ax.plot(x, y, color=color, linewidth=linewidth, label=legend_label)
+        
+        
         # Calculate area (using simplified assumption)
         # try:
         #     contour_array = np.array(pts, dtype=float)
@@ -139,7 +141,9 @@ def plot_single_image_contours(
         all_contour_points.append({
     "contour_id": i,
     "x": list(x.astype(int)),                    # convert np.array to regular list
-    "depth_m": [round(float(d), 5) for d in y]   # convert and round
+    "depth_m": [round(float(d), 5) for d in y],
+    "area":round(float(vugs[i]["area"]), 2),
+    "hole_radius":round(float(vugs[i]["hole_radius"]), 2),
     })
     ax.set_ylabel("Depth (m)")
     start_tick = int(np.ceil(depth_vector[0]))
@@ -203,7 +207,10 @@ def process_single_threshold(args):
             min_circ_ratio=min_circ_ratio,
             max_circ_ratio=max_circ_ratio
         )
-        #print(f"[INFO] VUGS: {vugs['area']}")
+        try:
+            print(f"[INFO] VUGS: {vugs[0]['area']}")
+        except Exception as e:
+            print(f"[ERROR] Failed to print VUG area: {e}")
 
         if len(contours) == 0:
             print(f"[WARNING] No contours at threshold {diff_thresh:.2f}")
@@ -211,7 +218,7 @@ def process_single_threshold(args):
         print(f"[INFO] plotting contours now!")
         mode_subtracted = np.abs(fmi_array - diff_thresh)
         png,contour_csv = plot_single_image_contours(
-            mode_subtracted, contours,
+            mode_subtracted, contours, vugs,
             cmap='YlOrBr',
             linewidth=2,
             colorbar=False,
