@@ -156,7 +156,7 @@ def array_to_png_batches_parallel(arr: np.ndarray, depth: np.ndarray, batch_size
     return final_buf.read()
 
 
-def save_contours_to_csv(contour_csv_outputs, sha_short, timestamp, directory="/app/well_files"):
+def save_contours_to_csv(contour_csv_outputs, sha_short, directory="/app/well_files"):
     """
     Save grouped contour data (x[], depth_m[]) to a CSV with native Python types.
     """
@@ -181,7 +181,7 @@ def save_contours_to_csv(contour_csv_outputs, sha_short, timestamp, directory="/
     df = pd.DataFrame(all_contour_rows)
 
     os.makedirs(directory, exist_ok=True)
-    filename = f"vug_contours_{sha_short}_{timestamp}.csv"
+    filename = f"vug_contours_{sha_short}.csv"
     full_path = os.path.join(directory, filename)
 
     df.to_csv(full_path, index=False)

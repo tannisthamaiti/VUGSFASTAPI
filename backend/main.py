@@ -10,7 +10,7 @@ def setup():
 
 setup()
 
-from fastapi import FastAPI, Query, HTTPException, Depends,Body
+from fastapi import FastAPI, Query, HTTPException, File,Body,UploadFile
 from fastapi.responses import FileResponse, StreamingResponse,HTMLResponse
 from pydantic import BaseModel
 import os
@@ -18,7 +18,7 @@ from vug_extractor import extract_and_plot_contours, plotfmi
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from pathlib import Path
-from helper import array_to_png, array_to_png_batches_parallel,save_contours_to_csv
+from helper import array_to_png_batches_parallel,save_contours_to_csv
 from utils.data import get_data
 import io
 import numpy as np
@@ -28,6 +28,8 @@ from fastapi import Header, Request, Response
 import json
 import hashlib
 from datetime import datetime
+import tempfile
+import base64
 
 
 app = FastAPI()
@@ -39,6 +41,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Metadata-SHA256"]
 )
 
 
@@ -56,11 +59,28 @@ import numpy as np
 import io
 from pathlib import Path
 
-@app.post("/extract-vugs/")
+@app.get("/download_vug_csv/{sha_id}")
+def download_csv(sha_id: str):
+    data_path = Path("/app/well_files")
+    csv_file = data_path / f"vug_contours_{sha_id}.csv"
+
+    # Check if the CSV file exists
+    if not csv_file.exists():
+        raise HTTPException(status_code=404, detail="CSV file not found")
+
+    # Return file as a downloadable response
+    return FileResponse(
+        path=csv_file,
+        media_type='text/csv',
+        filename=f"vug_contours_{sha_id}.csv"
+    )
+
+    
+
+@app.post("/extract_vugs/")
 def extractvugs(
     vug_request: VugRequest = Body(default=VugRequest()),
-    sha_short: str = Query(..., description="Short SHA ID (first 8 chars)"),
-    timestamp: str = Query(..., description="UTC timestamp in format YYYYMMDDTHHMMSSZ")
+    sha_short: str = Query(..., description="Short SHA ID (first 8 chars)")
 ):
     """
     Extract vugs from pre-processed FMI data identified by SHA + timestamp.
@@ -74,10 +94,9 @@ def extractvugs(
 
     # Build file paths
     data_path = Path("/app/well_files")
-    fmi_csv = data_path / f"fmi_array_{sha_short}_{timestamp}.csv"
-    unscaled_csv = data_path / f"fmi_array_unscaled_{sha_short}_{timestamp}.csv"
-    tdep_csv = data_path / f"tdep_array_{sha_short}_{timestamp}.csv"
-    radius_csv = data_path / f"well_radius_{sha_short}_{timestamp}.csv"
+    fmi_csv = data_path / f"fmi_array_{sha_short}.csv"
+    tdep_csv = data_path / f"tdep_array_{sha_short}.csv"
+    radius_csv = data_path / f"well_radius_{sha_short}.csv"
 
     try:
         # Load required data
@@ -111,10 +130,12 @@ def extractvugs(
         if not png_list:
             raise ValueError("No vug plots were generated.")
         
-        save_contours_to_csv(contour_csv, sha_short, timestamp)
+        csv_path=save_contours_to_csv(contour_csv, sha_short)
+        png_base64 = base64.b64encode(png_list[0]).decode('utf-8')
 
         return StreamingResponse(io.BytesIO(png_list[0]), media_type="image/png")
-        #return HTMLResponse(content=png_list)
+       
+        
 
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=f"Required file not found: {e}")
@@ -122,103 +143,116 @@ def extractvugs(
         raise HTTPException(status_code=500, detail=f"Processing error: {e}")
 
 
-   
 
-@app.get("/plotfmi")
-def plotfmi_handler(
-    request: Request,
-    response: Response,
-    x_metadata: str = Header(...),
-    timestamp: str = Header(..., description="UTC timestamp in format YYYYMMDDTHHMMSSZ")
+@app.post("/process_dlis", tags=["Processing"])
+async def process_dlis_handler(
+    file: UploadFile = File(..., description="Binary DLIS file to process.")
 ):
     """
-    PNG heat-map of the full scaled FMI array with SHA256-based tracking and UTC timestamp.
-    Saves derived CSVs and logs metadata using SHA+timestamp identifier.
+    Accepts a binary DLIS file, saves it temporarily, processes it using a 
+    path-based function, and returns a PNG heat-map.
     """
-
-    # === Step 1: Parse metadata from header ===
-    try:
-        metadata_dict = json.loads(x_metadata)
-        print(f"[INFO] Received metadata: {metadata_dict}")
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON in X-Metadata")
-
-    # === Step 2: Compute SHA256 and timestamp ===
-    sha_full = hashlib.sha256(x_metadata.encode()).hexdigest()
-    sha_short = sha_full[:8]
-    #timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")  # Safe, short ISO-like
-    timestamp = timestamp
-    response.headers["X-Metadata-SHA256"] = sha_full
-    response.headers["X-Server-Timestamp"] = timestamp
-    print(f"[INFO] SHA256: {sha_full}, Short: {sha_short}, Timestamp: {timestamp}")
-
-    # === Step 3: Load data ===
     start_time = time.time()
+    # 1. Generate cryptographically strong random data.
+    random_data = os.urandom(64)
+
+    # 2. Create a SHA256 hash of the random data.
+    full_sha256 = hashlib.sha256(random_data).hexdigest()
+
+    # 3. Take the first 8 characters of the resulting hex string.
+    short_sha = full_sha256[:8]
+
+
+    
+    # Read the file content from the upload
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    
     data_path = Path("/app/well_files")
-    metadata_log_path = data_path / "metadata_log.csv"
 
-    try:
-        fmi_array, tdep_array, well_radius = get_data(data_path, dyn=False)
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=f"Data missing: {e}")
+    # Use a temporary directory that is automatically cleaned up
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            # Create a Path object for the temporary directory
+            temp_dir_path = Path(temp_dir)
+            
+            # Define the full path for the temporary file
+            temp_file_path = temp_dir_path / file.filename
+            
+            # Write the uploaded content to the temporary file
+            with open(temp_file_path, 'wb') as f:
+                f.write(contents)
+            
+            print(f"[INFO] File '{file.filename}' temporarily saved to '{temp_dir_path}'")
+            
+            # === Call your path-based function with the temporary directory path ===
+            fmi_array, tdep_array, well_radius = get_data(str(temp_dir_path))
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=422, detail=f"DLIS processing error: {e}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
-    # === Step 4: Preprocess and plot ===
-    try:
-        DEPTH_VEC = tdep_array
-        SCALED_DATA = fmi_array
+           
+            # === Step 4: Preprocess and plot ===
+        try:
+            DEPTH_VEC = tdep_array
+            SCALED_DATA = fmi_array
 
-        fmi_array_doi, _, tdep_array_doi, well_radius_doi = plotfmi(
-            data_path=SCALED_DATA,
-            depth_path=DEPTH_VEC,
-            well_radius=well_radius,
-            start_depth=DEPTH_VEC.min(),
-            end_depth=DEPTH_VEC.max()
-        )
+            fmi_array_doi, _, tdep_array_doi, well_radius_doi = plotfmi(
+                data_path=SCALED_DATA,
+                depth_path=DEPTH_VEC,
+                well_radius=well_radius,
+                start_depth=DEPTH_VEC.min(),
+                end_depth=DEPTH_VEC.max()
+            )
 
-        # Skip NaN rows from top
-        start_index = np.argmax(~np.all(np.isnan(fmi_array), axis=1))
-        fmi_array_doi = fmi_array_doi[start_index:]
-        tdep_array_doi = tdep_array_doi[start_index:]
-        well_radius_doi = well_radius_doi[start_index:]
+            # Skip NaN rows from top
+            start_index = np.argmax(~np.all(np.isnan(fmi_array), axis=1))
+            fmi_array_doi = fmi_array_doi[start_index:]
+            tdep_array_doi = tdep_array_doi[start_index:]
+            well_radius_doi = well_radius_doi[start_index:]
 
-        # === Step 5: Save CSVs with short hash + timestamp in name ===
-        fmi_csv = data_path / f"fmi_array_{sha_short}_{timestamp}.csv"
-        tdep_csv = data_path / f"tdep_array_{sha_short}_{timestamp}.csv"
-        radius_csv = data_path / f"well_radius_{sha_short}_{timestamp}.csv"
+            
+            # === Step 5: Save CSVs with short hash + timestamp in name ===
+            fmi_csv = data_path / f"fmi_array_{short_sha}.csv"
+            tdep_csv = data_path / f"tdep_array_{short_sha}.csv"
+            radius_csv = data_path / f"well_radius_{short_sha}.csv"
 
-        pd.DataFrame(fmi_array_doi).to_csv(fmi_csv, header=False, index=False)
-        #pd.DataFrame(fmi_array_doi_unscaled).to_csv(unscaled_csv, header=False, index=False)
-        pd.DataFrame(tdep_array_doi).to_csv(tdep_csv, header=False, index=False)
-        pd.DataFrame(well_radius_doi).to_csv(radius_csv, header=False, index=False)
+            pd.DataFrame(fmi_array_doi).to_csv(fmi_csv, header=False, index=False)
+            pd.DataFrame(tdep_array_doi).to_csv(tdep_csv, header=False, index=False)
+            pd.DataFrame(well_radius_doi).to_csv(radius_csv, header=False, index=False)
 
-        # === Step 6: Log metadata ===
-        log_entry = pd.DataFrame([{
-            "sha_id": sha_full,
-            "sha_short": sha_short,
-            "timestamp": timestamp,
-            "fmi_array_path": str(fmi_csv),
-            "tdep_array_path": str(tdep_csv),
-            "well_radius_path": str(radius_csv),
-            "original_metadata": x_metadata
-        }])
-        log_entry.to_csv(metadata_log_path, mode='a', index=False, header=not metadata_log_path.exists())
+            # === Step 6: Log metadata ===
+            # log_entry = pd.DataFrame([{
+            #     "sha_id": sha_full,
+            #     "sha_short": sha_short,
+            #     "timestamp": timestamp,
+            #     "fmi_array_path": str(fmi_csv),
+            #     "tdep_array_path": str(tdep_csv),
+            #     "well_radius_path": str(radius_csv),
+            #     "original_metadata": x_metadata
+            # }])
+            # log_entry.to_csv(metadata_log_path, mode='a', index=False, header=not metadata_log_path.exists())
 
-        # === Step 7: Generate PNG ===
-        png_bytes = array_to_png_batches_parallel(fmi_array_doi, tdep_array_doi, batch_size=500)
+            # === Step 7: Generate PNG ===
+            png_bytes = array_to_png_batches_parallel(fmi_array_doi, tdep_array_doi, batch_size=500)
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
+        
+            
+    # The temporary directory and its contents are now automatically deleted.
 
     duration = time.time() - start_time
-    print(f"[TIMER] /plotfmi completed in {duration:.2f} seconds.")
+    print(f"[TIMER] Full request for '{file.filename}' completed in {duration:.2f} seconds.")
 
     return StreamingResponse(
         io.BytesIO(png_bytes),
         media_type="image/png",
         headers={
-            "X-Metadata-SHA256": sha_full,
-            "X-Server-Timestamp": timestamp
-        }
+            "X-Metadata-SHA256": short_sha
+            }
     )
 
     
