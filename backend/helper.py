@@ -19,31 +19,6 @@ from PIL import Image
 MISSING_THRESHOLD = -5000         # ≤ −5000 → missing / NaN
 
 
-# ─── loaders ───────────────────────────────────────────────────────────
-# def load_depth(depth_path: Path) -> np.ndarray:
-#     """
-#     Read single-column CSV → (N,) float64 vector.
-#     """
-#     if not depth_path.exists():
-#         raise FileNotFoundError(depth_path)
-#     depth = pd.read_csv(depth_path, header=None,nrows=50000).astype(float).values.squeeze()
-#     return depth
-
-
-# def load_and_scale(array_path: Path) -> np.ndarray:
-#     """
-#     Read 2-D CSV, replace sentinel values with NaN, then Min-Max scale
-#     each column independently. NaNs become 0 after scaling.
-#     """
-#     if not array_path.exists():
-#         raise FileNotFoundError(array_path)
-#     arr = pd.read_csv(array_path, header=None,nrows=50000).astype(float).values
-#     arr[arr <= MISSING_THRESHOLD] = np.nan
-
-#     col_min = np.nanmin(arr, axis=0, keepdims=True)
-#     col_max = np.nanmax(arr, axis=0, keepdims=True)
-#     scaled  = (arr - col_min) / (col_max - col_min)
-#     return np.nan_to_num(scaled, nan=0.0)
 
 
 MISSING_THRESHOLD = -998.0  # or your defined threshold
@@ -165,8 +140,8 @@ def save_contours_to_csv(contour_csv_outputs, sha_short, directory="/app/well_fi
     for contour_group in contour_csv_outputs:
         for contour in contour_group:
             contour_id = int(contour["contour_id"])
-            x_list = [int(x) for x in contour["x"]]  # Convert np.int64 to int
-            y_list = [float(y) for y in contour["depth_m"]]  # Convert np.float64 to float
+            x_list = contour["x"] #[int(x) for x in contour["x"]]  # Convert np.int64 to int
+            y_list = contour["depth_m"] #[float(y) for y in contour["depth_m"]]  # Convert np.float64 to float
             area = float(contour["area"])
             hole_radius=float(contour["hole_radius"])
 

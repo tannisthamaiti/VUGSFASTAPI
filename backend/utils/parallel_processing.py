@@ -95,7 +95,7 @@ def plot_single_image_contours_plotly(
     return html, all_contour_points
 
 def plot_single_image_contours(
-        img, circles,vugs, linewidth=2, cmap='YlOrBr', color='black',
+        img, circles,vugs,centroids, linewidth=2, cmap='YlOrBr', color='black',
         legend=False, colorbar=False, title='', fontsize=12, labelsize=12,
         axis_off=False, depth_vector=None
 ):
@@ -138,10 +138,11 @@ def plot_single_image_contours(
         #     print(f"[ERROR] Failed to compute area for contour {i}: {e}")
         # for xi, yi in zip(x, y):
         #     all_contour_points.append({"contour_id": i, "x": xi, "depth_m": yi})
+        cx, cy = centroids[i]
         all_contour_points.append({
     "contour_id": i,
-    "x": list(x.astype(int)),                    # convert np.array to regular list
-    "depth_m": [round(float(d), 5) for d in y],
+    "x": cx, #list(x.astype(int)),                    
+    "depth_m": round(float(depth_vector[cy]),2),#[round(float(d), 5) for d in y],
     "area":round(float(vugs[i]["area"]), 2),
     "hole_radius":round(float(vugs[i]["hole_radius"]), 2),
     })
@@ -208,7 +209,7 @@ def process_single_threshold(args):
             max_circ_ratio=max_circ_ratio
         )
         try:
-            print(f"[INFO] VUGS: {vugs[0]['area']}")
+            print(f"[INFO] VUGS centroid: {centroids[0]}")
         except Exception as e:
             print(f"[ERROR] Failed to print VUG area: {e}")
 
@@ -218,7 +219,7 @@ def process_single_threshold(args):
         print(f"[INFO] plotting contours now!")
         mode_subtracted = np.abs(fmi_array - diff_thresh)
         png,contour_csv = plot_single_image_contours(
-            mode_subtracted, contours, vugs,
+            mode_subtracted, contours, vugs,centroids,
             cmap='YlOrBr',
             linewidth=2,
             colorbar=False,
